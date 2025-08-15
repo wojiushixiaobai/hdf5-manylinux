@@ -7,33 +7,35 @@ on:
 
 jobs:
   build_image:
-    name: Build ${{ matrix.prefix }} image for ${{ matrix.arch }}
-    runs-on: ${{ matrix.runs-on }}
+    name: Build ${{ matrix.IMAGE.TAG_NAME }} image
+    runs-on: ${{ matrix.IMAGE.RUNNER }}
     strategy:
+      fail-fast: false
       matrix:
-        include:
-         - prefix: manylinux
-           version: '2_28'
-           arch: x86_64
-           platforms: linux/amd64
-           runs-on: ubuntu-latest
-         - prefix: manylinux
-           version: '2_28'
-           arch: aarch64
-           platforms: linux/arm64
-           runs-on: ubuntu-24.04-arm
-         - prefix: musllinux
-           version: '1_2'
-           arch: x86_64
-           platforms: linux/amd64
-           runs-on: ubuntu-latest
-         - prefix: musllinux
-           version: '1_2'
-           arch: aarch64
-           platforms: linux/arm64
-           runs-on: ubuntu-24.04-arm
+        IMAGE:
+          # x86-64 manylinux images
+          # - {TAG_NAME: "manylinux2014_x86_64-hdf5", BUILD_ARGS: "PYCA_RELEASE=manylinux2014_x86_64", BUILD_PLATFORM: "linux/amd64", RUNNER: "ubuntu-24.04"}
+          - {TAG_NAME: "manylinux_2_28_x86_64-hdf5", BUILD_ARGS: "PYCA_RELEASE=manylinux_2_28_x86_64", BUILD_PLATFORM: "linux/amd64", RUNNER: "ubuntu-24.04"}
+          # - {TAG_NAME: "manylinux_2_34_x86_64-hdf5", BUILD_ARGS: "PYCA_RELEASE=manylinux_2_34_x86_64", BUILD_PLATFORM: "linux/amd64", RUNNER: "ubuntu-24.04"}
+          # - {TAG_NAME: "musllinux_1_1_x86_64-hdf5", BUILD_ARGS: "PYCA_RELEASE=musllinux_1_1_x86_64", BUILD_PLATFORM: "linux/amd64", RUNNER: "ubuntu-24.04"}
+          - {TAG_NAME: "musllinux_1_2_x86_64-hdf5", BUILD_ARGS: "PYCA_RELEASE=musllinux_1_2_x86_64", BUILD_PLATFORM: "linux/amd64", RUNNER: "ubuntu-24.04"}
+
+          # ARM64 manylinux images
+          # - {TAG_NAME: "manylinux2014_aarch64-hdf5", BUILD_ARGS: "PYCA_RELEASE=manylinux2014_aarch64", BUILD_PLATFORM: "linux/arm64", RUNNER: "ubuntu-24.04-arm"}
+          - {TAG_NAME: "manylinux_2_28_aarch64-hdf5", BUILD_ARGS: "PYCA_RELEASE=manylinux_2_28_aarch64", BUILD_PLATFORM: "linux/arm64", RUNNER: "ubuntu-24.04-arm"}
+          # - {TAG_NAME: "manylinux_2_34_aarch64-hdf5", BUILD_ARGS: "PYCA_RELEASE=manylinux_2_34_aarch64", BUILD_PLATFORM: "linux/arm64", RUNNER: "ubuntu-24.04-arm"}
+          # - {TAG_NAME: "musllinux_1_1_aarch64-hdf5", BUILD_ARGS: "PYCA_RELEASE=musllinux_1_1_aarch64", BUILD_PLATFORM: "linux/arm64", RUNNER: "ubuntu-24.04-arm"}
+          - {TAG_NAME: "musllinux_1_2_aarch64-hdf5", BUILD_ARGS: "PYCA_RELEASE=musllinux_1_2_aarch64", BUILD_PLATFORM: "linux/arm64", RUNNER: "ubuntu-24.04-arm"}
+
+          # Other images(ppc64le, s390x, etc.) can be added here if needed
+          # - https://github.com/pypa/manylinux/issues/1793
+          # - https://github.com/IBM/actionspz/blob/main/docs/FAQ.md
+
     steps:
     - uses: actions/checkout@v4
+
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v3
 
     - name: Login to GitHub Container Registry
       uses: docker/login-action@v3
@@ -45,7 +47,13 @@ jobs:
     - name: Build and push
       uses: docker/build-push-action@v6
       with:
-        file: ./Dockerfile_${{ matrix.prefix }}_${{ matrix.version }}_${{ matrix.arch }}
-        platforms: ${{ matrix.platforms }}
+        file: Dockerfile
+        platforms: ${{ matrix.IMAGE.BUILD_PLATFORM }}
+        pull: true
         push: ${{ github.event_name != 'pull_request' }}
-        tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.prefix }}_${{ matrix.version }}_${{ matrix.arch }}-hdf5
+        build-args: |
+          ${{ matrix.IMAGE.BUILD_ARGS }}
+        tags: |
+          ghcr.io/${{ github.repository_owner }}/${{ matrix.IMAGE.TAG_NAME }}
+        cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.IMAGE.TAG_NAME }}-buildcache
+        cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.IMAGE.TAG_NAME }}-buildcache,mode=max

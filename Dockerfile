@@ -1,4 +1,5 @@
-FROM quay.io/pypa/musllinux_1_2_aarch64
+ARG PYCA_RELEASE
+FROM quay.io/pypa/${PYCA_RELEASE}
 
 ENV HDF5_VERSION=1.14.6
 ENV HDF5_DIR=/usr/local
